@@ -1,0 +1,398 @@
+\documentclass{rapportECL}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{titlesec}
+\usepackage{float}
+\titlespacing{\section}{0pt}{*1}{*1}    
+\titlespacing{\subsection}{0pt}{*1}{*1}  
+\usepackage[ruled,vlined,french, onelanguage]{algorithm2e}
+% For algorithms
+\usepackage{lipsum}
+\usepackage{enumitem}
+\RequirePackage{mathtools} %Paquet pour des équations et symboles mathématiques
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{indentfirst}
+
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+\usepackage{subcaption}
+\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+
+
+
+\definecolor{darkgreen}{rgb}{0.0, 0.5, 0.0}
+\lstdefinestyle{prologStyle}{
+    language=Prolog,
+    basicstyle=\ttfamily\small,
+    commentstyle=\color{green!50!black},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{gray},
+    numbers=left,
+    frame=single,
+    breaklines=true,
+    breakatwhitespace=true,
+    tabsize=4
+}
+
+
+\lstdefinestyle{mypython}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{green!50!black},
+    showstringspaces=false,
+    breaklines=true,
+    numbers=left,
+    numberstyle=\tiny,
+    numbersep=5pt,
+    frame=tb,
+    framerule=0.5pt,
+    backgroundcolor=\color{gray!5},
+    tabsize=4,
+    rulecolor=\color{black!30},
+    aboveskip=10pt,
+    belowskip=10pt
+}
+\setlength{\parindent}{0pt}
+
+
+\RequirePackage{siunitx} %Pour écrire avec la notation scientifique (Ex.: \num{2e+9})
+\usepackage{multirow} % Inclure le package multirow dans le préambule du document
+\title{Rapport} %Titre du fichier
+\begin{document}
+
+%----------- Informations du rapport ---------
+
+\titre{Section 2\\Deep learning applications}
+
+
+\eleves{Kai MA,  Ruyi TANG,  Jinyi WU} %Nom des élèves
+
+%----------- Initialisation -------------------
+        
+\fairemarges %Afficher les marges
+\fairepagedegarde %Créer la page de garde
+
+\newpage
+
+\tabledematieres
+
+
+\newpage
+\chapter*{2-a: Transfer Learning}
+\addcontentsline{toc}{chapter}{2-a: Transfer Learning}
+\setcounter{section}{0}
+
+In this section, we will use the VGG16 Network pre-trained on the \textit{ImageNet} dataset and attempt to transfer it to the \textit{15 Scene} dataset for prediction. First, we extract features using the pre-trained model, and then using linear SVM on the extracted features to obtain classification results.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\linewidth]{VGG16.png}
+    \caption{VGG16 Networks}
+    \label{fig:1}
+\end{figure}
+
+\section{VGG16 Architecture}
+As shown in Figure 1, VGG16, as the name suggests, consists of 16 weight layers, including 13 convolutional layers and 3 fully connected layers, excluding pooling and activation layers. For better understanding, the structure of VGG16 can be divided into 5 blocks, as clearly demonstrated in the following code:
+\lstset{
+    backgroundcolor=\color{gray!10}, % 设置灰色背景
+    basicstyle=\ttfamily, % 代码字体
+    breaklines=true, % 自动换行
+    columns=fullflexible % 调整列宽
+}
+\begin{lstlisting}[language=Python]
+class VGG16(nn.Module):
+    def __init__(self, num_classes=1000):
+        super(VGG16, self).__init__()
+        self.features = nn.Sequential(
+            # Block 1
+            nn.Conv2d(3, 64, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            # Block 2
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 128, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            # Block 3
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            # Block 4
+            nn.Conv2d(256, 512, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            # Block 5
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+        )
+        
+        self.classifier = nn.Sequential(
+            nn.Linear(512 * 7 * 7, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, num_classes),
+        )
+    
+    def forward(self, x):
+        x = self.features(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+\end{lstlisting}
+
+\begin{description}
+    \item[Q1*] \textbf{Knowing that the fully-connected layers account for the majority of the parameters in a model, give an estimate on the number of parameters of VGG16 (using the sizes given in Figure 1).}
+    
+    Parameter Calculation Formula:
+    \[
+    \begin{aligned}
+    \text{Conv Parameters} &= (\text{Kernel size} \times \text{Input Channel} + 1) \times \text{Output Channel} \\
+    \text{FC Parameters} &= (\text{Input size} + 1) \times \text{Output size}
+    \end{aligned}
+    \]
+    
+    The detailed calculation is as follows:
+    
+    \begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|}
+    \hline
+    \textbf{Layer Name}  & \textbf{Input Channel} & \textbf{Kernel Size} & \textbf{Output Channel} & \textbf{Parameter Number} \\ \hline
+    Conv1-1         & 3         & $3 \times 3$        & 64                  & 1,792            \\ \hline
+    Conv1-2         & 64        & $3 \times 3$        & 64                  & 36,928           \\ \hline
+    Conv2-1         & 64        & $3 \times 3$        & 128                 & 73,856           \\ \hline
+    Conv2-2         & 128       & $3 \times 3$        & 128                 & 147,584          \\ \hline
+    Conv3-1         & 128       & $3 \times 3$        & 256                 & 295,168          \\ \hline
+    Conv3-2         & 256       & $3 \times 3$        & 256                 & 590,080          \\ \hline
+    Conv3-3         & 256       & $3 \times 3$        & 256                 & 590,080          \\ \hline
+    Conv4-1         & 256       & $3 \times 3$        & 512                 & 1,180,160        \\ \hline
+    Conv4-2         & 512       & $3 \times 3$        & 512                 & 2,359,808        \\ \hline
+    Conv4-3         & 512       & $3 \times 3$        & 512                 & 2,359,808        \\ \hline
+    Conv5-1         & 512       & $3 \times 3$        & 512                 & 2,359,808        \\ \hline
+    Conv5-2         & 512       & $3 \times 3$        & 512                 & 2,359,808        \\ \hline
+    Conv5-3         & 512       & $3 \times 3$        & 512                 & 2,359,808        \\ \hline
+    \end{tabular}
+    \caption{Number of parameters in convolutional layers of VGG16}
+    \label{tab:conv_params}
+    \end{table}
+    
+    \begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|c|c|}
+    \hline
+    \textbf{Layer Name}  & \textbf{Input Size} & \textbf{Output Size} & \textbf{Parameter Number}   \\ \hline
+    FC1             & 25,088             & 4,096              & 102,764,544         \\ \hline
+    FC2             & 4,096              & 4,096              & 16,781,312          \\ \hline
+    FC3             & 4,096              & 1,000              & 4,097,000           \\ \hline
+    \end{tabular}
+    \caption{Number of parameters in fully connected layers of VGG16}
+    \label{tab:fc_params}
+    \end{table}
+    
+    \textbf{Total Number of Parameters:}
+    \[
+    14,714,688 + 119,572,864 = 138,357,544
+    \]
+
+    In summary, VGG16 has approximately 138 million parameters.
+
+    \item[Q2*] \textbf{What is the output size of the last layer of VGG16? What does it correspond to?}
+
+    The output size of the last layer of VGG16 is 1000, it represents to the number of class in the ImageNet Dataset.
+
+    \item[Q3*] \textbf{Apply the network on several images of your choice and comment on the results.
+    \begin{itemize}
+    \item What is the role of the ImageNet normalization?
+    \item Why setting the model to eval mode?
+    \end{itemize}}
+
+    We applied the VGG16 network on several images, the results is as follows:
+    \begin{figure}[H]
+        \centering
+        \begin{subfigure}{0.45\linewidth}
+            \centering
+            \includegraphics[width=\linewidth]{cat.png}
+            \caption{Cat $\to$ Egyptian cat}
+            \label{fig:cat}
+        \end{subfigure}
+        \begin{subfigure}{0.45\linewidth}
+            \centering
+            \includegraphics[width=\linewidth]{dog.png}
+            \caption{Dog $\to$ Wire-haired fox terrier}
+            \label{fig:dog}
+        \end{subfigure}
+        \begin{subfigure}{0.45\linewidth}
+            \centering
+            \includegraphics[width=\linewidth]{antelope.png}
+            \caption{Antelope $\to$ hartebeest}
+            \label{fig:antelope}
+        \end{subfigure}
+        \begin{subfigure}{0.45\linewidth}
+            \centering
+            \includegraphics[width=\linewidth]{plate.png}
+            \caption{Plate $\to$ burrito}
+            \label{fig:plate}
+        \end{subfigure}
+        \caption{Results on several images}
+        \label{fig:grid}
+    \end{figure}
+    VGG16 performs well in distinguishing general categories in images but may have some errors in finer details, such as differentiating between breeds of cats and dogs or identifying specific subcategories of objects. Therefore, further improvements are needed for VGG16 to handle classification tasks on external images more accurately.
+    
+    \begin{description}[leftmargin=0cm]
+        \item[ImageNet Normalization:] Since the image sizes we selected vary, it is necessary to preprocess the images using ImageNet normalization. This ensures that the pixel values of the input images align with the distribution of the training data, which also helps improve the model's generalization ability and robustness. Specifically, the images are first resized to (3, 224, 224) and scaled to the range [0, 1], followed by normalization using the mean and standard deviation of ImageNet.
+        \item[model.eval():] Setting the model to evaluation mode disables the dropout layers and ensures the Batch Normalization (BN) layers use global mean and variance, thereby guaranteeing stability and consistency during inference.
+    \end{description}
+
+    \item[Q4] \textbf{Bonus:Visualize several activation maps obtained after the first convolutional layer. How can we interpret them?}
+    
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.5\linewidth]{activation map.png}
+        \caption{Activation Maps}
+        \label{fig:enter-label}
+    \end{figure}
+    We visualized the first 16 activation maps of the first convolutional layer. It can be observed that after one convolution operation, each kernel extracts different features from the input image and generates an activation map. Through these features, the network can understand the content of the input image, such as edges, shapes, and textures.
+
+\end{description}
+
+\section{Transfer Learning wtih VGG16 on 15 Scene}
+In the previous section, we understood the structure and working principles of VGG16. Now, we aim to improve its classification performance on external images (15 Scene). To achieve this, we need to perform transfer learning.
+
+\subsection{Approach}
+Transfer learning consists of two steps: first, using a pretrained network for feature extraction, and then training a classification neural network with the extracted features. We will use the output of the relu7 layer in VGG16 as the result of feature extraction and employ an SVM classifier to complete the classification task for the 15 Scene dataset.
+
+\begin{description}
+    \item[Q5*] \textbf{Why not directly train VGG16 on 15 Scene?}
+    
+    VGG16 has over 138 million parameters, while the 15 Scene dataset contains only 4,485 samples. The training set is too small, so directly training VGG16 on the 15 Scene dataset could lead to overfitting.
+
+    \item[Q6*]  \textbf{How can pre-training on ImageNet help classification for 15 Scene?}
+    
+    The early layers of convolutional neural networks typically learn general features such as edges, textures, and shapes. These features are universal across different images and can be directly applied to the 15 Scene dataset using the features learned from ImageNet. This avoids redundant training, effectively prevents overfitting, reduces computational costs, and accelerates convergence.
+
+    \item[Q7] \textbf{What limits can you see with feature extraction? }
+
+    Feature extraction can have several limits:
+    \begin{itemize}
+        \item Feature extraction heavily relies on the features learned from the pretraining dataset. If there is a significant difference between the target dataset and the pretraining dataset, the performance may be suboptimal. For example, ImageNet primarily consists of natural scenes, so if the target dataset involves satellite images or medical images, it may fail to extract effective features.
+        \item Feature extraction with a pretrained model fixes the model parameters, making it impossible to optimize them based on the target dataset. This limitation can prevent the model from achieving optimal performance.
+    \end{itemize}
+    
+\end{description}
+
+\subsection{Feature Extration with VGG16}
+
+To implement feature extraction, we defined a new class VGG16relu7 to copy all layers of VGG16 up to relu7, effectively removing the last fully connected layer.
+
+\begin{description}
+    \item[Q8] \textbf{What is the impact of the layer at which the features are extracted?}
+
+    \begin{itemize}
+        \item Lower layers (closer to the input) extract more general features that are applicable to various types of images and have lower computational costs; however, their expressive power is limited, making them incapable of capturing higher-level information.
+        \item Higher layers (closer to the output) extract richer semantic information and perform better on data that is highly similar to the training data; however, they have weaker adaptability and typically require higher computational costs.
+    \end{itemize}
+    Thus, in practical applications, the choice of feature extraction layers should consider the similarity between the target data and the pretrained data, as well as the available computational resources.
+
+    \item[Q9] \textbf{The images from 15 Scene are black and white, but VGG16 requires RGB images. How can we get around this problem?}
+
+    The images in the 15 Scene dataset do not meet the input requirements of VGG16, so preprocessing is necessary. To ensure the input images are in RGB format, we duplicate the single channel of grayscale images to expand them into a pseudo-RGB three-channel format, then convert them into Pillow image objects. Next, we normalize the pixel values of the images. Finally, we use transform.Compose to combine the preprocessing steps.
+    \begin{lstlisting}[language=Python]
+    def duplicateChannel(img):
+        img = img.convert('L')
+        np_img = np.array(img, dtype=np.uint8)
+        np_img = np.dstack([np_img, np_img, np_img])
+        img = Image.fromarray(np_img, 'RGB') 
+        return img
+    def resizeImage(img):
+      return img.resize((224,224), Image.BILINEAR)
+
+    # Add pre-processing
+    train_dataset = datasets.ImageFolder(path+'/train',
+        transform=transforms.Compose([
+            transforms.Lambda(duplicateChannel),
+            transforms.Lambda(resizeImage),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ]))
+    val_dataset = datasets.ImageFolder(path+'/test',
+        transform=transforms.Compose([
+            transforms.Lambda(duplicateChannel),
+            transforms.Lambda(resizeImage),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ]))
+    \end{lstlisting}
+  
+\end{description}
+
+\subsection{Training SVM classifiers}
+Next, we will use the extracted features to train a multi-class SVM classifier and evaluate its performance.
+
+\begin{description}
+    \item[Q10] \textbf{Rather than training an independent classifier, is it possible to just use neural network? Explain.}
+
+    Theoretically, it is possible to use only a neural network to perform classification tasks by simply adding a fully connected layer after the frozen CNN. By adding new convolutional layers, the neural network can further optimize the extracted features and improve the model's accuracy. However, this approach increases computational costs and carries the risk of overfitting, especially with small-scale datasets. In contrast, using an SVM classifier can work efficiently and stably with fixed extracted features.
+
+\end{description}
+
+\subsection{Going further}
+
+\begin{description}
+    \item[Q11] \textbf{For every improvement that you test, explain your reasoning and comment on the obtained results.}
+    
+    There are several methods to improve the model, and we have tried some of them and created a bar chart to compare the accuracy of different models:
+    \begin{itemize}
+        \item \textbf{Change the layer at which the features are extracted.} We defined VGG16relu6, which uses the relu6 layer and all preceding layers of VGG16 for feature extraction. The output shape remains as (batch size, 4096), but with one less fully connected layer compared to VGG16relu7. This allows the model to focus more on general features, enhancing its generalization ability on new data, which leads to better performance.
+        \item \textbf{Try other available pre-trained networks.} We used ResNet as the pre-trained model and trained it on the 15Scene dataset, finding that it slightly outperformed VGG16.
+        \item \textbf{Tune the parameter C to improve performance.} We adjusted the SVM parameter C to 10, but the difference compared to the initial value C=1 was minimal.
+    \end{itemize}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.5\linewidth]{accuracy.png}
+        \caption{Comparison of accuracy}
+        \label{fig:enter-label}
+    \end{figure}
+\end{description}
+
+\section{Conclusion}
+In this chapter, we studied the framework of VGG16 and applied the pre-trained VGG16 model on ImageNet to train on the 15Scene dataset through transfer learning. We also explored different optimization methods, such as adjusting the feature extraction layers, selecting different pre-trained models, and tuning the classifier parameters.
+
+The key points of transfer learning are as follows:
+\vspace{-0.8em}
+\begin{enumerate}
+    \item[1] Ensure that the format of the target data matches the format of the pre-trained data, making normalization an essential step.
+    \item[2] During the feature extraction stage, it is important to choose the appropriate extraction layer to balance model performance and generalization ability. Additionally, ensure that the extracted feature dimensions are compatible with the classifier for training.
+\end{enumerate}
+
+\end{document}
